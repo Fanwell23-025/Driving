@@ -1,3 +1,5 @@
+if("serviceWorker" in navigator){ window.addEventListener("load", () => { navigator.serviceWorker.register("sw.js").catch(() => {}); }); }
+
 fetch("data/data.json").then(r => { if(!r.ok) throw new Error("HTTP " + r.status); return r.json(); }).then(start).catch(e => {
   console.error(e);
   document.getElementById("app").innerHTML = '<div class="card"><p><b>The study material could not load.</b> Check your connection and reload the page.</p></div>';
