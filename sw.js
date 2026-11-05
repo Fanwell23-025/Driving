@@ -1,9 +1,10 @@
 /* Service worker: keeps the whole site on the device so it works with no signal.
    VERSION and PRECACHE are generated. Run `node scripts/build-precache.js` to refresh them. */
 /* BEGIN GENERATED */
-const VERSION = "37fd84a49a48";
+const VERSION = "a0c9663e45d7";
 const PRECACHE = [
   "./",
+  "404.html",
   "css/style.css",
   "data/data.json",
   "fonts/barlow-400.woff2",
