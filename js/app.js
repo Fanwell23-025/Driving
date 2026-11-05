@@ -397,17 +397,34 @@ function viewSearch(){
 
 /* ---------- about and progress backup ---------- */
 let backupMsg = "", pendingImport = null;
+const SOURCES = `The manual "Let's Drive Safely" (Official Question Catalogue for class B and EB) supplies the lessons, the picture pages, the numbers sheet and the "select all that apply" questions. The four official test papers (Tests 1 to 4, each 30 questions with the answer marked) give the exam-style questions; duplicates between papers are kept in the papers but shown once in practice and mock exams. The Majuma speed and parking sheets add 28 more, and the sign chart gives the sign quiz. Two answer marks on the papers disagree with the manual (Test 1 Q30, Test 4 Q3) and one on the Majuma parking sheet (Q1), and each is flagged where it appears. Progress is saved in this browser only.`;
 function viewAbout(){
   const tried = Object.keys(store.q).length;
   return `
-  <h1>About and your progress</h1>
-  <section class="card stack" style="margin-top:14px">
+  <h1>About this site</h1>
+  <div class="stack" style="margin-top:14px">
+  <section class="card stack">
+    <h2 class="h3">What this is</h2>
+    <p>This site is study material built from the owner's driving books. It is not an official government test, and it is not connected to any government department or testing station.</p>
+    <p>Papers labelled "official" are the practice papers from those books. A score here does not count towards your licence. Rules and test details can change, so confirm them with your testing station.</p>
+  </section>
+  <section class="card stack">
+    <h2 class="h3">Sources</h2>
+    <p class="small">${SOURCES}</p>
+    <p class="small">The picture pages are scans from the published manual "Let's Drive Safely" and remain the property of its publisher.</p>
+  </section>
+  <section class="card stack">
+    <h2 class="h3">Privacy</h2>
+    <p>No accounts and no tracking. Your progress stays on this device, in your browser's storage, and only leaves it if you export it yourself. The site is hosted on GitHub Pages, and GitHub may keep routine server logs, as any web host does.</p>
+  </section>
+  <section class="card stack">
     <h2 class="h3">Move your progress to another phone</h2>
     <p class="small">Save your progress as a file, send it to the other phone, then import it there. You have tried ${tried} question${tried===1?"":"s"} and taken ${store.exams.length} exam${store.exams.length===1?"":"s"} on this device.</p>
     <div class="row"><button class="btn" data-act="export">Export progress</button><label class="btn alt file-btn" for="importFile">Import progress</label><input class="sr-only" type="file" id="importFile" accept=".json,application/json"></div>
     ${backupMsg ? `<p class="small" role="status"><b>${esc(backupMsg)}</b></p>` : ""}
     ${pendingImport ? `<div class="note"><p><b>Replace the progress on this device?</b> The file has ${Object.keys(pendingImport.q).length} questions tried and ${pendingImport.exams.length} exams. What is saved here now will be overwritten.</p><div class="row" style="margin-top:10px"><button class="btn" data-act="importyes">Replace my progress</button><button class="btn ghost" data-act="importno">Cancel</button></div></div>` : ""}
-  </section>`;
+  </section>
+  </div>`;
 }
 function exportProgress(){
   const blob = new Blob([JSON.stringify({app:"botswana-theory-prep", exported:new Date().toISOString(), progress:store}, null, 1)], {type:"application/json"});
@@ -550,7 +567,7 @@ function focusKey(el){
   return '[data-act="' + el.dataset.act + '"]' + ["k","i","id","to","n","t"].map(a => el.dataset[a] !== undefined ? `[data-${a}="${el.dataset[a]}"]` : "").join("");
 }
 const BASE_TITLE = document.title;
-const SCREEN_TITLES = {learn:"Learn", cheat:"Numbers to remember", signs:"Road signs", practice:"Practice", exams:"Exams", mistakes:"Mistakes", about:"About and your progress", search:"Search"};
+const SCREEN_TITLES = {learn:"Learn", cheat:"Numbers to remember", signs:"Road signs", practice:"Practice", exams:"Exams", mistakes:"Mistakes", about:"About", search:"Search"};
 let firstRender = true;
 function render(keep){
   const y = window.scrollY, fk = focusKey(document.activeElement);
@@ -674,7 +691,7 @@ document.addEventListener("keydown", e => {
 
 /* ---------- sources footnote ---------- */
 $("#sources").innerHTML = `<summary>Where the questions come from</summary>
-<p style="margin-top:8px">The manual "Let's Drive Safely" (Official Question Catalogue for class B and EB) supplies the lessons, the picture pages, the numbers sheet and the "select all that apply" questions. The four official test papers (Tests 1 to 4, each 30 questions with the answer marked) give the exam-style questions; duplicates between papers are kept in the papers but shown once in practice and mock exams. The Majuma speed and parking sheets add 28 more, and the sign chart gives the sign quiz. Two answer marks on the papers disagree with the manual (Test 1 Q30, Test 4 Q3) and one on the Majuma parking sheet (Q1), and each is flagged where it appears. Progress is saved in this browser only.</p>`;
+<p style="margin-top:8px">${SOURCES}</p>`;
 
 render();
 }
