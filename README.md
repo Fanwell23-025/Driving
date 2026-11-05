@@ -24,7 +24,7 @@ The service worker keeps serving its saved copy, so when testing changes use a p
 
 GitHub Pages serves the `main` branch from the repo root, so every push to `main` goes live within a minute or two. There is nothing else to deploy.
 
-Phones pick up a new version the next time they open the site online. That relies on the version hash in `sw.js`, which the pre-commit hook keeps up to date.
+Phones pick up a new version the next time they open the site online. That relies on the version hashes in `sw.js`, which the pre-commit hook keeps up to date. On a first visit the app itself installs right away and the pictures follow in the background. An update downloads the pictures again only if a picture changed.
 
 ## Before you commit
 
@@ -39,7 +39,7 @@ It runs two scripts, which need only Node:
 | Script | What it does |
 | --- | --- |
 | `node scripts/check-content.js` | Checks that answer indexes are valid, no option is empty, ids are unique and every referenced image exists. Also checks that the three disputed keys keep their notes and that the answer key has not changed. |
-| `node scripts/build-precache.js` | Updates the list of offline files and the version hash in `sw.js`. |
+| `node scripts/build-precache.js` | Updates the lists of offline files and the version hashes in `sw.js`. |
 
 GitHub Actions runs the same checks on every push.
 

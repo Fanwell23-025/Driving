@@ -1,8 +1,11 @@
 /* Service worker: keeps the whole site on the device so it works with no signal.
-   VERSION and PRECACHE are generated. Run `node scripts/build-precache.js` to refresh them. */
+   The small app shell installs first, as one unit, so offline starts working quickly. Pictures then
+   download in the background a few at a time, and a dropped download only costs that one file.
+   Everything between the markers is generated. Run `node scripts/build-precache.js` to refresh it. */
 /* BEGIN GENERATED */
-const VERSION = "38c40fff1835";
-const PRECACHE = [
+const SHELL_VERSION = "85447257bade";
+const MEDIA_VERSION = "9e796e351b2a";
+const SHELL = [
   "./",
   "404.html",
   "css/style.css",
@@ -18,6 +21,12 @@ const PRECACHE = [
   "icons/icon-192.png",
   "icons/icon-512.png",
   "icons/icon-maskable-512.png",
+  "index.html",
+  "js/app.js",
+  "js/config.js",
+  "manifest.webmanifest"
+];
+const MEDIA = [
   "img/T1_q19.jpeg",
   "img/T1_q21.jpeg",
   "img/T1_q22.jpeg",
@@ -69,10 +78,6 @@ const PRECACHE = [
   "img/sp_q13.jpg",
   "img/sp_q2.jpg",
   "img/sp_q3.jpg",
-  "index.html",
-  "js/app.js",
-  "js/config.js",
-  "manifest.webmanifest",
   "pages/p032.webp",
   "pages/p033.webp",
   "pages/p034.webp",
@@ -186,27 +191,56 @@ const PRECACHE = [
   "signs/s28.png"
 ];
 /* END GENERATED */
-const CACHE = "theory-prep-" + VERSION;
+const SHELL_CACHE = "theory-prep-shell-" + SHELL_VERSION;
+const MEDIA_CACHE = "theory-prep-media-" + MEDIA_VERSION;
+const pathOf = u => new URL(u, location.href).pathname;
+const MEDIA_PATHS = new Set(MEDIA.map(pathOf));
+const PARALLEL = 4;
+
+// Downloads whichever pictures are still missing, so an interrupted run resumes where it stopped.
+let filling = null;
+function fillMedia(){
+  if(!filling){
+    filling = caches.open(MEDIA_CACHE).then(async cache => {
+      const have = new Set((await cache.keys()).map(r => pathOf(r.url)));
+      const todo = MEDIA.filter(u => !have.has(pathOf(u)));
+      const worker = async () => {
+        for(let u = todo.shift(); u; u = todo.shift()){
+          try{ await cache.add(u); }catch(err){ /* the next page load tries again */ }
+        }
+      };
+      await Promise.all(Array.from({length: PARALLEL}, worker));
+    }).finally(() => { filling = null; });
+  }
+  return filling;
+}
 
 self.addEventListener("install", e => {
   e.waitUntil(
-    caches.open(CACHE)
-      .then(c => c.addAll(PRECACHE.map(u => new Request(u, {cache: "reload"}))))
+    caches.open(SHELL_CACHE)
+      .then(c => c.addAll(SHELL.map(u => new Request(u, {cache: "reload"}))))
       .then(() => self.skipWaiting())
   );
 });
 
 self.addEventListener("activate", e => {
+  const keep = [SHELL_CACHE, MEDIA_CACHE];
   e.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k.startsWith("theory-prep-") && k !== CACHE).map(k => caches.delete(k))))
+      .then(keys => Promise.all(keys.filter(k => k.startsWith("theory-prep-") && keep.indexOf(k) < 0).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
+      .then(() => { fillMedia(); })
   );
 });
 
+// Each page load asks for this, because the browser may stop a long download once the site is closed.
+self.addEventListener("message", e => {
+  if(e.data === "fill") e.waitUntil(fillMedia());
+});
+
 self.addEventListener("fetch", e => {
-  const req = e.request;
-  if(req.method !== "GET" || new URL(req.url).origin !== location.origin) return;
+  const req = e.request, url = new URL(req.url);
+  if(req.method !== "GET" || url.origin !== location.origin) return;
   if(req.mode === "navigate"){
     // A page load: the app itself comes from the cache, anything else from the network (so 404.html still works online).
     e.respondWith(
@@ -214,13 +248,18 @@ self.addEventListener("fetch", e => {
     );
     return;
   }
-  if(new URL(req.url).pathname.endsWith("/js/config.js")){
+  if(url.pathname.endsWith("/js/config.js")){
     // Settings: take the latest when online, so editing the file reaches phones without a rebuild.
     e.respondWith(
-      fetch(req).then(res => { const copy = res.clone(); if(res.ok) caches.open(CACHE).then(c => c.put(req, copy)); return res; })
+      fetch(req).then(res => { const copy = res.clone(); if(res.ok) caches.open(SHELL_CACHE).then(c => c.put(req, copy)); return res; })
         .catch(() => caches.match(req, {ignoreSearch: true}))
     );
     return;
   }
-  e.respondWith(caches.match(req, {ignoreSearch: true}).then(hit => hit || fetch(req)));
+  e.respondWith(
+    caches.match(req, {ignoreSearch: true}).then(hit => hit || fetch(req).then(res => {
+      if(res.ok && MEDIA_PATHS.has(url.pathname)){ const copy = res.clone(); caches.open(MEDIA_CACHE).then(c => c.put(req, copy)); }
+      return res;
+    }))
+  );
 });

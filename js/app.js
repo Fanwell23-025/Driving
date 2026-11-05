@@ -1,4 +1,4 @@
-if("serviceWorker" in navigator){ window.addEventListener("load", () => { navigator.serviceWorker.register("sw.js").catch(() => {}); }); }
+if("serviceWorker" in navigator){ window.addEventListener("load", () => { navigator.serviceWorker.register("sw.js").then(() => navigator.serviceWorker.ready).then(r => { if(r.active) r.active.postMessage("fill"); }).catch(() => {}); }); }
 
 fetch("data/data.json").then(r => { if(!r.ok) throw new Error("HTTP " + r.status); return r.json(); }).then(start).catch(e => {
   console.error(e);
