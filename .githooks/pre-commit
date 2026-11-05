@@ -1,0 +1,6 @@
+#!/bin/sh
+# Turn on once per clone with: git config core.hooksPath .githooks
+set -e
+node scripts/check-content.js
+node scripts/build-precache.js
+git add sw.js

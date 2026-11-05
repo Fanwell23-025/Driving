@@ -7,7 +7,7 @@ const fs = require("fs"), path = require("path"), crypto = require("crypto");
 const ROOT = path.join(__dirname, "..");
 const SW = path.join(ROOT, "sw.js");
 const SKIP_DIRS = new Set(["scripts", "docs", "node_modules"]);
-const SKIP_FILES = new Set(["sw.js", "README.md", "robots.txt", "fonts/OFL.txt", "package.json", "icons/og-image.png"]);
+const SKIP_FILES = new Set(["sw.js", "README.md", "data/answer-key.lock", "robots.txt", "fonts/OFL.txt", "package.json", "icons/og-image.png"]);
 
 function walk(dir, out){
   for(const name of fs.readdirSync(path.join(ROOT, dir)).sort()){
