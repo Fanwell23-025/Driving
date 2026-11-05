@@ -1,3 +1,8 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Botswana Theory Test Prep</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -28,7 +33,7 @@
   color-scheme:dark;
 }
 *{box-sizing:border-box}
-body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:16px;line-height:1.5;padding-bottom:84px}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:16px;line-height:1.5;padding-bottom:84px}
 .shell{max-width:1000px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 32px}
 h1,h2,h3{font-family:var(--font-display);font-weight:700;letter-spacing:.01em;line-height:1.1;margin:0;text-wrap:balance}
 h1{font-size:clamp(2.1rem,6vw,3.2rem);text-transform:uppercase}
@@ -135,6 +140,8 @@ select,input[type=date]{font:inherit;color:var(--ink);background:var(--surface);
 .fields > div{display:flex;flex-direction:column;gap:6px}
 @media (prefers-reduced-motion:no-preference){.bar i{transition:width .4s}}
 </style>
+</head>
+<body>
 
 <div class="shell" id="shell">
   <header class="top">
@@ -626,3 +633,5 @@ $("#sources").innerHTML = `<summary>Where the questions come from</summary>
 render();
 })();
 </script>
+</body>
+</html>
