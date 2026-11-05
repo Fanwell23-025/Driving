@@ -25,6 +25,10 @@ const $ = s => document.querySelector(s);
 function shuffle(a){ a = a.slice(); for(let i=a.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]] = [a[j],a[i]]; } return a; }
 const webp = f => f.replace(/\.jpg$/, ".webp");
 const thumb = f => f.replace(/^pages\/(.*)\.jpg$/, "pages/thumbs/$1.webp");
+function qImg(q){
+  const img = `<img class="q-img ${q.signImg?"sign":""}" src="${q.img}" alt="${q.signImg?"Road sign":"Picture for the question"}" decoding="async">`;
+  return q.signImg ? img : `<button class="zoom" data-act="zoom" data-src="${q.img}" aria-label="Enlarge the picture">${img}</button>`;
+}
 const poolAll = () => Q.filter(q => !q.dup);
 const poolSingle = () => Q.filter(q => !q.dup && !q.multi);
 const inTopic = t => poolAll().filter(q => q.topic === t);
@@ -118,11 +122,11 @@ function pick(k){
     const p = it.sel.indexOf(k); if(p >= 0) it.sel.splice(p,1); else it.sel.push(k);
     render(true); return;
   }
-  it.sel = [k]; it.done = true; it.ok = itemCorrect(it); rec(it.q.id, it.ok); save(); render(true);
+  it.sel = [k]; it.done = true; it.ok = itemCorrect(it); rec(it.q.id, it.ok); save(); render(true); focusOn(".fb");
 }
 function checkMulti(){
   const it = S.items[S.i]; if(it.done || !it.sel.length) return;
-  it.done = true; it.ok = itemCorrect(it); rec(it.q.id, it.ok); save(); render(true);
+  it.done = true; it.ok = itemCorrect(it); rec(it.q.id, it.ok); save(); render(true); focusOn(".fb");
 }
 function go(d){
   const n = S.i + d;
@@ -219,11 +223,11 @@ function viewLearn(){
   return `
   <h1>Learn</h1>
   <p class="muted" style="margin:6px 0 16px">Fourteen lessons that follow the manual. Read one, then practise it. The numbers sheet gathers every figure the test likes to ask.</p>
-  <div class="card row" style="justify-content:space-between;margin-bottom:14px"><div><h3>Numbers to remember</h3><div class="muted small">Speeds, distances, dimensions, time limits</div></div><button class="btn" data-act="cheat">Open</button></div>
+  <div class="card row" style="justify-content:space-between;margin-bottom:14px"><div><h2 class="h3">Numbers to remember</h2><div class="muted small">Speeds, distances, dimensions, time limits</div></div><button class="btn" data-act="cheat">Open</button></div>
   <section class="grid g2">
   ${TOP.map(t => { const s = topicStats(t.id); return `
     <button class="card topic" data-act="topic" data-id="${t.id}" style="cursor:pointer">
-      <div class="topic-head"><span class="num">${t.id}</span><div><h3>${esc(t.title)}</h3><div class="muted small">${esc(t.sub)}</div></div></div>
+      <div class="topic-head"><span class="num">${t.id}</span><div><h2 class="h3">${esc(t.title)}</h2><div class="muted small">${esc(t.sub)}</div></div></div>
       <div class="row"><span class="pill ${s.cls}">${s.status}</span><span class="muted small">${(DATA.lessons[t.id]||[]).length} key points</span></div>
     </button>`; }).join("")}
   </section>`;
@@ -238,9 +242,9 @@ function viewTopic(id){
   <div class="row" style="margin-bottom:10px"><button class="btn ghost" data-act="nav" data-to="learn">All lessons</button>
     ${id>1?`<button class="btn ghost" data-act="topic" data-id="${id-1}">Previous</button>`:""}${id<TOP.length?`<button class="btn ghost" data-act="topic" data-id="${id+1}">Next</button>`:""}</div>
   <div class="topic-head" style="margin-bottom:14px"><span class="num plate" style="font-size:1.6rem">${id}</span><div><h1 style="font-size:clamp(1.9rem,5vw,2.8rem)">${esc(t.title)}</h1><div class="muted">${esc(t.sub)}</div></div></div>
-  <section class="card lesson"><h3 style="margin-bottom:12px">What to know</h3><ul>${pts.map(p => `<li>${esc(p)}</li>`).join("")}</ul></section>
-  ${pg.length ? `<section class="card" style="margin-top:14px"><h3>Picture pages from the manual</h3><p class="muted small" style="margin:4px 0 12px">These are the pages from your book, with the correct answer printed under each question. Tap a page to read it large. The number is the printed page number.</p><div class="thumbs">${pg.map((p,i) => `<button data-act="page" data-t="${id}" data-i="${i}" aria-label="Open manual page ${p.p}"><picture><source srcset="${thumb(p.f)}" type="image/webp"><img loading="lazy" decoding="async" src="${p.f}" alt="Manual page ${p.p}" width="240" height="340"></picture><span>p.${p.p}</span></button>`).join("")}</div></section>` : ""}
-  <section class="card row" style="margin-top:14px;justify-content:space-between"><div><h3>Test yourself</h3><div class="muted small">${s.n} questions on this topic${s.acc!==null?`, ${s.acc}% right so far`:""}</div></div>
+  <section class="card lesson"><h2 class="h3" style="margin-bottom:12px">What to know</h2><ul>${pts.map(p => `<li>${esc(p)}</li>`).join("")}</ul></section>
+  ${pg.length ? `<section class="card" style="margin-top:14px"><h2 class="h3">Picture pages from the manual</h2><p class="muted small" style="margin:4px 0 12px">These are the pages from your book, with the correct answer printed under each question. Tap a page to read it large. The number is the printed page number.</p><div class="thumbs">${pg.map((p,i) => `<button data-act="page" data-t="${id}" data-i="${i}" aria-label="Open manual page ${p.p}"><picture><source srcset="${thumb(p.f)}" type="image/webp"><img loading="lazy" decoding="async" src="${p.f}" alt="Manual page ${p.p}" width="240" height="340"></picture><span>p.${p.p}</span></button>`).join("")}</div></section>` : ""}
+  <section class="card row" style="margin-top:14px;justify-content:space-between"><div><h2 class="h3">Test yourself</h2><div class="muted small">${s.n} questions on this topic${s.acc!==null?`, ${s.acc}% right so far`:""}</div></div>
     <div class="row"><button class="btn" data-act="drill" data-id="${id}" data-n="10">10 questions</button><button class="btn alt" data-act="drill" data-id="${id}">All of them</button></div></section>`;
 }
 
@@ -250,7 +254,7 @@ function viewCheat(){
   <h1>Numbers to remember</h1>
   <p class="muted" style="margin:6px 0 16px">Every figure here comes from your manual or the Majuma sheets.</p>
   <div class="grid g2">
-  ${DATA.cheat.map(g => `<section class="card"><div class="tw"><table><thead><tr><th colspan="2">${esc(g.h)}</th></tr></thead><tbody>${g.rows.map(r => `<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td></tr>`).join("")}</tbody></table></div></section>`).join("")}
+  ${DATA.cheat.map(g => `<section class="card"><div class="tw" tabindex="0"><table><thead><tr><th colspan="2">${esc(g.h)}</th></tr></thead><tbody>${g.rows.map(r => `<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td></tr>`).join("")}</tbody></table></div></section>`).join("")}
   </div>
   <div class="row" style="margin-top:16px"><button class="btn" data-act="mock">Test me on these</button></div>`;
 }
@@ -286,10 +290,10 @@ function viewExams(){
   return `
   <h1>Exams</h1>
   <p class="muted" style="margin:6px 0 16px">Thirty questions, no feedback until you finish, like the paper. Your stencil has a "Mistakes" box, so this page counts mistakes too.</p>
-  <section class="card row" style="justify-content:space-between;margin-bottom:14px"><div><h3>Mock exam</h3><div class="muted small">30 questions picked from the whole bank, favouring ones you have missed or not seen. ${mocks.length ? `Last ${mocks[mocks.length-1].score}/30.` : ""}</div></div><button class="btn big" data-act="mock">Start</button></section>
+  <section class="card row" style="justify-content:space-between;margin-bottom:14px"><div><h2 class="h3">Mock exam</h2><div class="muted small">30 questions picked from the whole bank, favouring ones you have missed or not seen. ${mocks.length ? `Last ${mocks[mocks.length-1].score}/30.` : ""}</div></div><button class="btn big" data-act="mock">Start</button></section>
   <h2 style="margin:20px 0 10px">Official test papers</h2>
   <section class="grid g2">${DATA.tests.map(t => `<div class="card row" style="justify-content:space-between"><div><h3>${esc(t.label)}</h3><div class="muted small">30 questions, original order. ${stat(t.id)}</div></div><button class="btn alt" data-act="official" data-id="${t.id}">Start</button></div>`).join("")}</section>
-  ${hist.length ? `<h2 style="margin:24px 0 10px">Recent results</h2><div class="card tw"><table><tbody>${hist.map(e => `<tr><td style="white-space:normal;font-weight:500">${esc(e.label)}<div class="muted small">${new Date(e.t).toLocaleString()}</div></td><td>${e.score}/${e.total}<div class="muted small" style="font-weight:400">${e.total-e.score} mistake${e.total-e.score===1?"":"s"}, ${fmtTime(e.secs)}</div></td></tr>`).join("")}</tbody></table></div>` : ""}`;
+  ${hist.length ? `<h2 style="margin:24px 0 10px">Recent results</h2><div class="card tw" tabindex="0"><table><tbody>${hist.map(e => `<tr><td style="white-space:normal;font-weight:500">${esc(e.label)}<div class="muted small">${new Date(e.t).toLocaleString()}</div></td><td>${e.score}/${e.total}<div class="muted small" style="font-weight:400">${e.total-e.score} mistake${e.total-e.score===1?"":"s"}, ${fmtTime(e.secs)}</div></td></tr>`).join("")}</tbody></table></div>` : ""}`;
 }
 
 function viewMistakes(){
@@ -299,7 +303,7 @@ function viewMistakes(){
   <h1>Mistakes</h1>
   <p class="muted" style="margin:6px 0 16px">${ids.length} question${ids.length===1?"":"s"} you last got wrong. A question leaves this list the next time you answer it right.</p>
   <div class="row" style="margin-bottom:16px"><button class="btn big" data-act="mist">Practise all ${ids.length}</button></div>
-  <div class="stack">${ids.map(id => { const q = QBY[id]; const ans = q.ans.map(i => q.opts[i]).join(" / "); return `<div class="card"><div class="row" style="justify-content:space-between"><span class="pill">${esc(TBY[q.topic].title)}</span>${q.ref?`<span class="pill">Manual ${esc(q.ref)}</span>`:""}</div><p style="margin-top:8px;font-weight:600">${esc(q.q)}</p>${q.img?`<img loading="lazy" decoding="async" class="q-img ${q.signImg?"sign":""}" src="${q.img}" alt="Question picture" data-act="zoom" data-src="${q.img}">`:""}<p class="small" style="margin-top:6px"><b>Answer:</b> ${esc(ans)}</p></div>`; }).join("")}</div>`;
+  <div class="stack">${ids.map(id => { const q = QBY[id]; const ans = q.ans.map(i => q.opts[i]).join(" / "); return `<div class="card"><div class="row" style="justify-content:space-between"><span class="pill">${esc(TBY[q.topic].title)}</span>${q.ref?`<span class="pill">Manual ${esc(q.ref)}</span>`:""}</div><p style="margin-top:8px;font-weight:600">${esc(q.q)}</p>${q.img?qImg(q):""}<p class="small" style="margin-top:6px"><b>Answer:</b> ${esc(ans)}</p></div>`; }).join("")}</div>`;
 }
 
 /* ---------- quiz view ---------- */
@@ -319,14 +323,14 @@ function viewQuiz(){
   let fb = "";
   if(showFb){
     const good = it.ok;
-    fb = `<div class="fb ${good?"good":"bad"}" role="status"><b>${good?"Correct.":"Not quite."}</b> ${q.ans.length>1?"All of the marked answers are needed.":""}
+    fb = `<div class="fb ${good?"good":"bad"}" role="status" tabindex="-1"><b>${good?"Correct.":"Not quite."}</b> ${q.ans.length>1?"All of the marked answers are needed.":""}
       <div class="small" style="margin-top:6px">${q.ref?`Look it up: manual ${esc(q.ref)}. `:""}Topic: <a href="#learn-${q.topic}" data-act="topic" data-id="${q.topic}">${esc(topic.title)}</a>.</div>
       ${q.note?`<div class="note">${esc(q.note)}</div>`:""}</div>`;
   }
   const last = S.i === n-1;
   return `
   <div class="row" style="justify-content:space-between;margin-bottom:10px">
-    <div><h2 style="font-size:1.4rem">${esc(S.title)}</h2><div class="muted small">Question ${S.i+1} of ${n}${S.exam?`, ${answered} answered`:""}</div></div>
+    <div><h1 style="font-size:1.4rem">${esc(S.title)}</h1><div class="muted small">Question ${S.i+1} of ${n}${S.exam?`, ${answered} answered`:""}</div></div>
     <div class="row"><span class="timer pill" id="timer">${fmtTime(Math.round((Date.now()-S.t0)/1000))}</span><button class="btn ghost" data-act="quit">${S.exam?"Quit":"Stop"}</button></div>
   </div>
   <div class="bar" style="margin-bottom:16px"><i style="width:${Math.round(100*(S.i+(showFb?1:0))/n)}%"></i></div>
@@ -335,7 +339,7 @@ function viewQuiz(){
     <div class="qhead"><span class="pill">${esc(topic.title)}</span>${S.exam?`<button class="btn ghost" data-act="flag">${S.flags[S.i]?"Unflag":"Flag for review"}</button>`:""}</div>
     <div class="q-text">${esc(q.q)}</div>
     ${multi?`<div class="muted small" style="margin-top:4px">Select all that apply.</div>`:""}
-    ${q.img?`<img class="q-img ${q.signImg?"sign":""}" src="${q.img}" alt="${q.signImg?"Road sign":"Picture for the question"}" ${q.signImg?"":`data-act="zoom" data-src="${q.img}"`}>`:""}
+    ${q.img?qImg(q):""}
     <div class="opts">${opts}</div>
     ${multi && !it.done ? `<div class="row" style="margin-top:12px"><button class="btn" data-act="check" ${it.sel.length?"":"disabled"}>Check answer</button></div>`:""}
     ${fb}
@@ -346,7 +350,7 @@ function viewQuiz(){
         : (last ? `<button class="btn" data-act="finish" ${it.done?"":"disabled"}>See results</button>` : `<button class="btn" data-act="next" ${it.done?"":"disabled"}>Next question</button>`)}
     </div>
   </section>
-  ${S.exam ? `<aside class="card"><h3 style="margin-bottom:10px">Questions</h3><div class="nav-grid">${S.items.map((x,i) => `<button data-act="jump" data-i="${i}" class="${i===S.i?"cur":(x.sel.length?"ans":"")} ${S.flags[i]?"flag":""}" aria-label="Question ${i+1}${x.sel.length?", answered":""}${S.flags[i]?", flagged":""}">${i+1}</button>`).join("")}</div><p class="muted small" style="margin-top:10px">${n-answered} unanswered. Underlined boxes are flagged. You can change an answer until you finish.</p></aside>` : ""}
+  ${S.exam ? `<aside class="card"><h2 class="h3" style="margin-bottom:10px">Questions</h2><div class="nav-grid">${S.items.map((x,i) => `<button data-act="jump" data-i="${i}" class="${i===S.i?"cur":(x.sel.length?"ans":"")} ${S.flags[i]?"flag":""}" aria-label="Question ${i+1}${x.sel.length?", answered":""}${S.flags[i]?", flagged":""}">${i+1}</button>`).join("")}</div><p class="muted small" style="margin-top:10px">${n-answered} unanswered. Underlined boxes are flagged. You can change an answer until you finish.</p></aside>` : ""}
   </div>
   ${S.confirmFinish ? `<div class="card" style="margin-top:14px;border-color:var(--warn)"><p><b>${n-answered} question${n-answered===1?" is":"s are"} still unanswered.</b> Finish anyway? Unanswered counts as a mistake.</p><div class="row" style="margin-top:10px"><button class="btn" data-act="finishyes">Finish now</button><button class="btn ghost" data-act="finishno">Keep going</button></div></div>`:""}
   ${S.confirmQuit ? `<div class="card" style="margin-top:14px;border-color:var(--warn)"><p><b>Leave this ${S.exam?"exam":"set"}?</b> ${S.exam?"The exam will not be scored.":"Answers so far are saved."}</p><div class="row" style="margin-top:10px"><button class="btn" data-act="quityes">Leave</button><button class="btn ghost" data-act="quitno">Stay</button></div></div>`:""}`;
@@ -365,7 +369,7 @@ function viewResults(){
     <div><div class="big-num" style="color:${mist?"var(--bad)":"var(--good)"}">${mist}</div><div class="muted">mistake${mist===1?"":"s"}</div></div>
     <div><div class="big-num">${fmtTime(S.secs)}</div><div class="muted">time taken</div></div></div>
     <p class="small muted" style="margin-top:12px">Your books do not state a pass mark. Ask your testing station for it, and aim to leave fewer mistakes each round.</p></section>
-  ${weakT.length ? `<section class="card"><h3>Where the mistakes were</h3><div class="row" style="margin-top:8px">${weakT.map(t => `<button class="pill bad" style="border:0;cursor:pointer" data-act="topic" data-id="${t}">${esc(TBY[t].title)}: ${byTopic[t].w}</button>`).join("")}</div></section>` : `<section class="card"><b>Clean sheet.</b> Take another mock to make sure it was not luck.</section>`}
+  ${weakT.length ? `<section class="card"><h2 class="h3">Where the mistakes were</h2><div class="row" style="margin-top:8px">${weakT.map(t => `<button class="pill bad" style="border:0;cursor:pointer" data-act="topic" data-id="${t}">${esc(TBY[t].title)}: ${byTopic[t].w}</button>`).join("")}</div></section>` : `<section class="card"><b>Clean sheet.</b> Take another mock to make sure it was not luck.</section>`}
   <div class="row" style="margin:16px 0">
     ${wrong.length && S.exam ? `<button class="btn big" data-act="retrywrong">Retry my ${wrong.length} mistake${wrong.length===1?"":"s"}</button>` : ""}
     ${S.kind==="mock"?`<button class="btn alt big" data-act="mock">Another mock</button>`:""}
@@ -375,22 +379,34 @@ function viewResults(){
     const yours = it.sel.length ? it.sel.map(k => q.opts[it.order[k]]).join(" / ") : "No answer";
     const right = q.ans.map(i => q.opts[i]).join(" / ");
     return `<div class="card"><div class="row" style="justify-content:space-between"><span class="pill">${esc(TBY[q.topic].title)}</span>${q.ref?`<span class="pill">Manual ${esc(q.ref)}</span>`:""}</div>
-      <p style="margin-top:8px;font-weight:600">${esc(q.q)}</p>${q.img?`<img loading="lazy" decoding="async" class="q-img ${q.signImg?"sign":""}" src="${q.img}" alt="Question picture" ${q.signImg?"":`data-act="zoom" data-src="${q.img}"`}>`:""}
+      <p style="margin-top:8px;font-weight:600">${esc(q.q)}</p>${q.img?qImg(q):""}
       <p class="small" style="margin-top:6px;color:var(--bad)"><b>You:</b> ${esc(yours)}</p><p class="small" style="color:var(--good)"><b>Correct:</b> ${esc(right)}</p>${q.note?`<div class="note">${esc(q.note)}</div>`:""}</div>`; }).join("")}</div>` : ""}`;
 }
 
 /* ---------- lightbox ---------- */
-let LB = null;
-function openLB(list, i){ LB = {list, i}; drawLB(); }
+let LB = null, lbOpener = null;
+function openLB(list, i){ LB = {list, i}; lbOpener = document.activeElement; drawLB(); }
+function closeLB(){ LB = null; drawLB(); if(lbOpener && lbOpener.isConnected) lbOpener.focus({preventScroll:true}); lbOpener = null; }
 function drawLB(){
+  $("#shell").inert = !!LB;
   if(!LB){ $("#lbRoot").innerHTML = ""; return; }
+  const fk = focusKey(document.activeElement);
   const cur = LB.list[LB.i];
   $("#lbRoot").innerHTML = `<div class="lb" role="dialog" aria-modal="true" aria-label="Enlarged picture"><div class="bar2"><span>${cur.label||""}</span><div class="row">${LB.list.length>1?`<button class="btn alt" data-act="lbprev">Previous</button><button class="btn alt" data-act="lbnext">Next</button>`:""}<button class="btn" data-act="lbclose">Close</button></div></div><div class="view"><picture>${cur.src.startsWith("pages/")?`<source srcset="${webp(cur.src)}" type="image/webp">`:""}<img src="${cur.src}" alt="${esc(cur.label||"Enlarged picture")}"></picture></div></div>`;
+  focusOn(fk && fk.indexOf('"lb') > 0 ? fk : '[data-act="lbclose"]');
 }
 
 /* ---------- render ---------- */
+function focusOn(sel){ const el = $(sel); if(el){ if(!el.matches("button,a,input,select")) el.setAttribute("tabindex","-1"); el.focus({preventScroll:true}); } }
+function focusKey(el){
+  if(!el || !el.dataset || !el.dataset.act) return null;
+  return '[data-act="' + el.dataset.act + '"]' + ["k","i","id","to","n","t"].map(a => el.dataset[a] !== undefined ? `[data-${a}="${el.dataset[a]}"]` : "").join("");
+}
+const BASE_TITLE = document.title;
+const SCREEN_TITLES = {learn:"Learn", cheat:"Numbers to remember", signs:"Road signs", practice:"Practice", exams:"Exams", mistakes:"Mistakes"};
+let firstRender = true;
 function render(keep){
-  const y = window.scrollY;
+  const y = window.scrollY, fk = focusKey(document.activeElement);
   renderTabs();
   let html;
   if(S) html = viewQuiz();
@@ -400,7 +416,15 @@ function render(keep){
     else html = ({home:viewHome, learn:viewLearn, cheat:viewCheat, signs:viewSigns, practice:viewPractice, exams:viewExams, mistakes:viewMistakes}[r] || viewHome)();
   }
   $("#app").innerHTML = html;
-  if(keep) window.scrollTo(0, y);
+  const st = S ? S.title : SCREEN_TITLES[route.split("-")[0]];
+  document.title = st ? st + " | Botswana Theory Test Prep" : BASE_TITLE;
+  if(keep){
+    window.scrollTo(0, y);
+    const again = fk && $(fk); if(again && !again.disabled) again.focus({preventScroll:true});
+  }else if(!firstRender){
+    focusOn(S && !S.finished ? ".q-text" : "#app h1");
+  }
+  firstRender = false;
 }
 setInterval(() => { if(S && !S.finished){ const t = $("#timer"); if(t) t.textContent = fmtTime(Math.round((Date.now()-S.t0)/1000)); } }, 1000);
 
@@ -436,15 +460,16 @@ document.addEventListener("click", e => {
     case "next": go(1); break;
     case "prev": go(-1); break;
     case "jump": S.i = +el.dataset.i; render(); window.scrollTo(0,0); break;
+    case "skip": focusOn("#app"); break;
     case "flag": S.flags[S.i] = !S.flags[S.i]; render(true); break;
     case "finish": {
       const un = S.items.filter(x => !x.sel.length).length;
-      if(S.exam && un){ S.confirmFinish = true; render(true); } else finish();
+      if(S.exam && un){ S.confirmFinish = true; render(true); focusOn('[data-act="finishyes"]'); } else finish();
       break; }
     case "finishyes": S.confirmFinish = false; finish(); break;
-    case "finishno": S.confirmFinish = false; render(true); break;
-    case "quit": S.confirmQuit = true; render(true); break;
-    case "quitno": S.confirmQuit = false; render(true); break;
+    case "finishno": S.confirmFinish = false; render(true); focusOn('[data-act="finish"]'); break;
+    case "quit": S.confirmQuit = true; render(true); focusOn('[data-act="quityes"]'); break;
+    case "quitno": S.confirmQuit = false; render(true); focusOn('[data-act="quit"]'); break;
     case "quityes": leave(); break;
     case "retrywrong": {
       const qs = shuffle(S.wrong.map(id => QBY[id]));
@@ -453,7 +478,7 @@ document.addEventListener("click", e => {
     case "page": {
       const t = el.dataset.t, list = DATA.pages[t].map(p => ({src:p.f, label:"Manual page " + p.p}));
       openLB(list, +el.dataset.i); break; }
-    case "lbclose": LB = null; drawLB(); break;
+    case "lbclose": closeLB(); break;
     case "lbprev": LB.i = (LB.i - 1 + LB.list.length) % LB.list.length; drawLB(); break;
     case "lbnext": LB.i = (LB.i + 1) % LB.list.length; drawLB(); break;
   }
@@ -463,13 +488,14 @@ document.addEventListener("change", e => {
 });
 document.addEventListener("keydown", e => {
   if(e.target.matches && e.target.matches("input,select,textarea")) return;
-  if(LB){ if(e.key === "Escape"){ LB = null; drawLB(); } else if(e.key === "ArrowRight" && LB.list.length>1){ LB.i = (LB.i+1)%LB.list.length; drawLB(); } else if(e.key === "ArrowLeft" && LB.list.length>1){ LB.i = (LB.i-1+LB.list.length)%LB.list.length; drawLB(); } return; }
+  if(LB){ if(e.key === "Escape"){ closeLB(); } else if(e.key === "ArrowRight" && LB.list.length>1){ LB.i = (LB.i+1)%LB.list.length; drawLB(); } else if(e.key === "ArrowLeft" && LB.list.length>1){ LB.i = (LB.i-1+LB.list.length)%LB.list.length; drawLB(); } return; }
   if(!S || S.finished) return;
   const it = S.items[S.i];
   const k = "abcdef".indexOf(e.key.toLowerCase());
   const d = "123456".indexOf(e.key);
   const idx = e.key.length === 1 && k >= 0 ? k : d;
   if(idx >= 0 && idx < it.order.length && !e.ctrlKey && !e.metaKey){ pick(idx); return; }
+  if(e.key === "Enter" && e.target.closest && e.target.closest("button,a,summary")) return;
   if(e.key === "ArrowRight" || e.key === "Enter"){ const nb = document.querySelector('[data-act="next"]:not([disabled])'); if(nb) go(1); }
   if(e.key === "ArrowLeft") go(-1);
 });
