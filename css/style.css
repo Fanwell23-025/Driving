@@ -83,6 +83,7 @@ nav.tabs button[aria-current="page"]{color:var(--sign);background:var(--surface2
 .lesson ul{padding-left:20px;margin:0}
 .thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px}
 .thumbs button{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:0;overflow:hidden;position:relative;aspect-ratio:3/4}
+.thumbs picture{display:contents}
 .thumbs img{width:100%;height:100%;object-fit:cover;object-position:top;display:block}
 .thumbs span{position:absolute;left:6px;bottom:6px;background:var(--sign);color:var(--sign-ink);font-size:.78rem;font-weight:600;padding:1px 7px;border-radius:99px}
 table{border-collapse:collapse;width:100%}

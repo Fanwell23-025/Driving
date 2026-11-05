@@ -23,6 +23,8 @@ function rec(id, ok){ const s = store.q[id] || {a:0,c:0,lw:false}; s.a++; if(ok)
 const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const $ = s => document.querySelector(s);
 function shuffle(a){ a = a.slice(); for(let i=a.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]] = [a[j],a[i]]; } return a; }
+const webp = f => f.replace(/\.jpg$/, ".webp");
+const thumb = f => f.replace(/^pages\/(.*)\.jpg$/, "pages/thumbs/$1.webp");
 const poolAll = () => Q.filter(q => !q.dup);
 const poolSingle = () => Q.filter(q => !q.dup && !q.multi);
 const inTopic = t => poolAll().filter(q => q.topic === t);
@@ -237,7 +239,7 @@ function viewTopic(id){
     ${id>1?`<button class="btn ghost" data-act="topic" data-id="${id-1}">Previous</button>`:""}${id<TOP.length?`<button class="btn ghost" data-act="topic" data-id="${id+1}">Next</button>`:""}</div>
   <div class="topic-head" style="margin-bottom:14px"><span class="num plate" style="font-size:1.6rem">${id}</span><div><h1 style="font-size:clamp(1.9rem,5vw,2.8rem)">${esc(t.title)}</h1><div class="muted">${esc(t.sub)}</div></div></div>
   <section class="card lesson"><h3 style="margin-bottom:12px">What to know</h3><ul>${pts.map(p => `<li>${esc(p)}</li>`).join("")}</ul></section>
-  ${pg.length ? `<section class="card" style="margin-top:14px"><h3>Picture pages from the manual</h3><p class="muted small" style="margin:4px 0 12px">These are the pages from your book, with the correct answer printed under each question. Tap a page to read it large. The number is the printed page number.</p><div class="thumbs">${pg.map((p,i) => `<button data-act="page" data-t="${id}" data-i="${i}" aria-label="Open manual page ${p.p}"><img loading="lazy" src="${p.f}" alt="Manual page ${p.p}"><span>p.${p.p}</span></button>`).join("")}</div></section>` : ""}
+  ${pg.length ? `<section class="card" style="margin-top:14px"><h3>Picture pages from the manual</h3><p class="muted small" style="margin:4px 0 12px">These are the pages from your book, with the correct answer printed under each question. Tap a page to read it large. The number is the printed page number.</p><div class="thumbs">${pg.map((p,i) => `<button data-act="page" data-t="${id}" data-i="${i}" aria-label="Open manual page ${p.p}"><picture><source srcset="${thumb(p.f)}" type="image/webp"><img loading="lazy" decoding="async" src="${p.f}" alt="Manual page ${p.p}" width="240" height="340"></picture><span>p.${p.p}</span></button>`).join("")}</div></section>` : ""}
   <section class="card row" style="margin-top:14px;justify-content:space-between"><div><h3>Test yourself</h3><div class="muted small">${s.n} questions on this topic${s.acc!==null?`, ${s.acc}% right so far`:""}</div></div>
     <div class="row"><button class="btn" data-act="drill" data-id="${id}" data-n="10">10 questions</button><button class="btn alt" data-act="drill" data-id="${id}">All of them</button></div></section>`;
 }
@@ -259,7 +261,7 @@ function viewSigns(){
   <h1>Road signs</h1>
   <p class="muted" style="margin:6px 0 16px">From your Botswana sign chart. The manual's lesson 7 pages show many more signs with their official meaning.</p>
   <div class="row" style="margin-bottom:18px"><button class="btn big" data-act="signquiz" data-n="10">Quiz me: 10 signs</button><button class="btn alt big" data-act="signquiz" data-n="29">All 29 signs</button><button class="btn ghost big" data-act="topic" data-id="7">Manual sign pages</button></div>
-  ${groups.map(g => `<h2 style="margin:18px 0 10px">${g} signs</h2><div class="signs">${DATA.signs.filter(s => s.g === g).map(s => `<figure><img src="${s.f}" alt="${esc(s.n)} sign" width="110" height="110"><figcaption>${esc(s.n)}</figcaption></figure>`).join("")}</div>`).join("")}`;
+  ${groups.map(g => `<h2 style="margin:18px 0 10px">${g} signs</h2><div class="signs">${DATA.signs.filter(s => s.g === g).map(s => `<figure><img loading="lazy" decoding="async" src="${s.f}" alt="${esc(s.n)} sign" width="110" height="110"><figcaption>${esc(s.n)}</figcaption></figure>`).join("")}</div>`).join("")}`;
 }
 
 function viewPractice(){
@@ -297,7 +299,7 @@ function viewMistakes(){
   <h1>Mistakes</h1>
   <p class="muted" style="margin:6px 0 16px">${ids.length} question${ids.length===1?"":"s"} you last got wrong. A question leaves this list the next time you answer it right.</p>
   <div class="row" style="margin-bottom:16px"><button class="btn big" data-act="mist">Practise all ${ids.length}</button></div>
-  <div class="stack">${ids.map(id => { const q = QBY[id]; const ans = q.ans.map(i => q.opts[i]).join(" / "); return `<div class="card"><div class="row" style="justify-content:space-between"><span class="pill">${esc(TBY[q.topic].title)}</span>${q.ref?`<span class="pill">Manual ${esc(q.ref)}</span>`:""}</div><p style="margin-top:8px;font-weight:600">${esc(q.q)}</p>${q.img?`<img class="q-img ${q.signImg?"sign":""}" src="${q.img}" alt="Question picture" data-act="zoom" data-src="${q.img}">`:""}<p class="small" style="margin-top:6px"><b>Answer:</b> ${esc(ans)}</p></div>`; }).join("")}</div>`;
+  <div class="stack">${ids.map(id => { const q = QBY[id]; const ans = q.ans.map(i => q.opts[i]).join(" / "); return `<div class="card"><div class="row" style="justify-content:space-between"><span class="pill">${esc(TBY[q.topic].title)}</span>${q.ref?`<span class="pill">Manual ${esc(q.ref)}</span>`:""}</div><p style="margin-top:8px;font-weight:600">${esc(q.q)}</p>${q.img?`<img loading="lazy" decoding="async" class="q-img ${q.signImg?"sign":""}" src="${q.img}" alt="Question picture" data-act="zoom" data-src="${q.img}">`:""}<p class="small" style="margin-top:6px"><b>Answer:</b> ${esc(ans)}</p></div>`; }).join("")}</div>`;
 }
 
 /* ---------- quiz view ---------- */
@@ -373,7 +375,7 @@ function viewResults(){
     const yours = it.sel.length ? it.sel.map(k => q.opts[it.order[k]]).join(" / ") : "No answer";
     const right = q.ans.map(i => q.opts[i]).join(" / ");
     return `<div class="card"><div class="row" style="justify-content:space-between"><span class="pill">${esc(TBY[q.topic].title)}</span>${q.ref?`<span class="pill">Manual ${esc(q.ref)}</span>`:""}</div>
-      <p style="margin-top:8px;font-weight:600">${esc(q.q)}</p>${q.img?`<img class="q-img ${q.signImg?"sign":""}" src="${q.img}" alt="Question picture" ${q.signImg?"":`data-act="zoom" data-src="${q.img}"`}>`:""}
+      <p style="margin-top:8px;font-weight:600">${esc(q.q)}</p>${q.img?`<img loading="lazy" decoding="async" class="q-img ${q.signImg?"sign":""}" src="${q.img}" alt="Question picture" ${q.signImg?"":`data-act="zoom" data-src="${q.img}"`}>`:""}
       <p class="small" style="margin-top:6px;color:var(--bad)"><b>You:</b> ${esc(yours)}</p><p class="small" style="color:var(--good)"><b>Correct:</b> ${esc(right)}</p>${q.note?`<div class="note">${esc(q.note)}</div>`:""}</div>`; }).join("")}</div>` : ""}`;
 }
 
@@ -383,7 +385,7 @@ function openLB(list, i){ LB = {list, i}; drawLB(); }
 function drawLB(){
   if(!LB){ $("#lbRoot").innerHTML = ""; return; }
   const cur = LB.list[LB.i];
-  $("#lbRoot").innerHTML = `<div class="lb" role="dialog" aria-modal="true" aria-label="Enlarged picture"><div class="bar2"><span>${cur.label||""}</span><div class="row">${LB.list.length>1?`<button class="btn alt" data-act="lbprev">Previous</button><button class="btn alt" data-act="lbnext">Next</button>`:""}<button class="btn" data-act="lbclose">Close</button></div></div><div class="view"><img src="${cur.src}" alt="${esc(cur.label||"Enlarged picture")}"></div></div>`;
+  $("#lbRoot").innerHTML = `<div class="lb" role="dialog" aria-modal="true" aria-label="Enlarged picture"><div class="bar2"><span>${cur.label||""}</span><div class="row">${LB.list.length>1?`<button class="btn alt" data-act="lbprev">Previous</button><button class="btn alt" data-act="lbnext">Next</button>`:""}<button class="btn" data-act="lbclose">Close</button></div></div><div class="view"><picture>${cur.src.startsWith("pages/")?`<source srcset="${webp(cur.src)}" type="image/webp">`:""}<img src="${cur.src}" alt="${esc(cur.label||"Enlarged picture")}"></picture></div></div>`;
 }
 
 /* ---------- render ---------- */
