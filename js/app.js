@@ -14,10 +14,25 @@ const L = "ABCDEF";
 const KEY = "botswana-theory-prep-v1";
 
 /* ---------- storage (browser only, safe if blocked) ---------- */
-function load(){ try{ const r = localStorage.getItem(KEY); if(r){ const o = JSON.parse(r); if(o && o.q) return o; } }catch(e){} return {v:1, examDate:"", q:{}, exams:[]}; }
+const SKEY = "botswana-theory-prep-session-v1";
+const DAY = 86400000;
+const REVIEW_GAPS = [1, 3];   // days before a missed question comes back: first review, second review
+const CFG = window.THEORY_CONFIG || {};
+const LIMIT = Number(CFG.examTimeLimitMinutes) > 0 ? Number(CFG.examTimeLimitMinutes) : null;
+function load(){ try{ const r = localStorage.getItem(KEY); if(r){ const o = JSON.parse(r); if(o && o.q) return migrate(o); } }catch(e){} return {v:1, examDate:"", q:{}, exams:[]}; }
+// Mistakes saved before reviews existed are due straight away.
+function migrate(o){ Object.keys(o.q).forEach(id => { const s = o.q[id]; if(s && s.lw && !s.rv) s.rv = {step:0, due:0}; }); return o; }
 let store = load();
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(store)); }catch(e){} }
-function rec(id, ok){ const s = store.q[id] || {a:0,c:0,lw:false}; s.a++; if(ok) s.c++; s.lw = !ok; s.t = Date.now(); store.q[id] = s; }
+function rec(id, ok){ const s = store.q[id] || {a:0,c:0,lw:false}; s.a++; if(ok) s.c++; s.lw = !ok; s.t = Date.now(); schedule(s, ok); store.q[id] = s; }
+function schedule(s, ok){
+  const now = Date.now();
+  if(!ok){ s.rv = {step:0, due: now + REVIEW_GAPS[0]*DAY}; return; }
+  if(s.rv && now >= s.rv.due){
+    const step = s.rv.step + 1;
+    if(step < REVIEW_GAPS.length) s.rv = {step, due: now + REVIEW_GAPS[step]*DAY}; else delete s.rv;
+  }
+}
 
 /* ---------- helpers ---------- */
 const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -39,7 +54,12 @@ function topicStats(t){
   let status = "New", cls = "";
   if(att >= 3){ if(acc < 70){ status = "Weak"; cls = "bad"; } else if(acc < 90){ status = "Getting there"; cls = "warn"; } else { status = "Strong"; cls = "good"; } }
   else if(att > 0){ status = "Started"; }
-  return {n: qs.length, seen, att, acc, status, cls};
+  return {n: qs.length, seen, att, cor, acc, status, cls};
+}
+function dueIds(){ const now = Date.now(); return Object.keys(store.q).filter(id => QBY[id] && store.q[id].rv && store.q[id].rv.due <= now); }
+function nextReviewDays(){
+  const dues = Object.keys(store.q).filter(id => QBY[id] && store.q[id].rv).map(id => store.q[id].rv.due);
+  return dues.length ? Math.max(1, Math.ceil((Math.min.apply(null, dues) - Date.now())/DAY)) : null;
 }
 function mistakeIds(){ return Object.keys(store.q).filter(id => store.q[id].lw && QBY[id]); }
 function fmtTime(sec){ const m = Math.floor(sec/60), s = sec%60; return m + ":" + String(s).padStart(2,"0"); }
@@ -75,9 +95,36 @@ function itemCorrect(it){
   const want = it.order.map((_,k) => k).filter(k => isRight(it,k)).join(",");
   return it.sel.slice().sort((a,b)=>a-b).join(",") === want;
 }
+const elapsed = () => Math.round((Date.now() - S.t0)/1000);
+function saveSession(){
+  if(!S || S.finished) return;
+  const d = {kind:S.kind, testId:S.testId, title:S.title, exam:S.exam, back:S.back, i:S.i, flags:S.flags, limit:S.limit, elapsed:elapsed(),
+    items:S.items.map(it => ({id:it.q.id, order:it.order, sel:it.sel, done:it.done, ok:it.ok, opts:it.q.signImg ? it.q.opts : undefined}))};
+  try{ localStorage.setItem(SKEY, JSON.stringify(d)); }catch(e){}
+}
+function clearSession(){ try{ localStorage.removeItem(SKEY); }catch(e){} }
+function loadSession(){
+  try{
+    const d = JSON.parse(localStorage.getItem(SKEY));
+    if(d && Array.isArray(d.items) && d.items.length && d.items.every(it => QBY[it.id] && Array.isArray(it.order) && Array.isArray(it.sel))) return d;
+  }catch(e){}
+  return null;
+}
+function resumeSession(){
+  const d = loadSession(); if(!d) return;
+  S = Object.assign({}, d, {t0: Date.now() - (d.elapsed||0)*1000, finished:false, i: Math.min(d.i||0, d.items.length-1), flags:d.flags||{},
+    items: d.items.map(it => { const q = QBY[it.id]; if(it.opts) q.opts = it.opts; return {q, order:it.order, sel:it.sel, done:!!it.done, ok:it.ok}; })});
+  window.scrollTo(0,0); render();
+}
+function resumeCard(){
+  const d = loadSession(); if(!d) return "";
+  const n = d.items.length, answered = d.items.filter(it => it.sel.length).length;
+  return `<section class="card row resume"><div><b class="resume-title">Pick up where you left off</b><div class="muted small">${esc(d.title)}. Question ${Math.min(d.i||0, n-1)+1} of ${n}, ${answered} answered.</div></div><div class="row"><button class="btn" data-act="resume">Resume</button><button class="btn ghost" data-act="discard">Discard</button></div></section>`;
+}
 function startSession(o){
-  S = Object.assign({i:0, t0:Date.now(), flags:{}, finished:false, back:"home"}, o);
+  S = Object.assign({i:0, t0:Date.now(), flags:{}, finished:false, back:"home", limit: o.exam ? LIMIT : null}, o);
   S.items = o.qs.map(q => mk(q, o.shuffle !== false));
+  delete S.qs;
   window.scrollTo(0,0);
   render();
 }
@@ -98,6 +145,11 @@ function startMistakes(){
   const qs = shuffle(mistakeIds().map(id => QBY[id]));
   if(!qs.length) return;
   startSession({kind:"practice", title:"Your mistakes", qs, exam:false, back:"mistakes"});
+}
+function startDue(){
+  const qs = shuffle(dueIds().map(id => QBY[id]));
+  if(!qs.length) return;
+  startSession({kind:"practice", title:"Due for review", qs, exam:false, back:"mistakes"});
 }
 function startSigns(n){
   buildSignQ();
@@ -141,11 +193,11 @@ function finish(){
     if(S.exam){ rec(it.q.id, ok); }
     if(ok) score++; else wrong.push(it.q.id);
   });
-  S.score = score; S.wrong = wrong;
+  S.score = score; S.wrong = wrong; clearSession();
   if(S.exam){ store.exams.push({t:Date.now(), kind:S.kind, testId:S.testId||null, label:S.title, score, total:S.items.length, secs:S.secs, wrong}); }
   save(); window.scrollTo(0,0); render();
 }
-function leave(){ const b = S ? S.back : "home"; S = null; setRoute(b); }
+function leave(){ const b = S ? S.back : "home"; S = null; clearSession(); setRoute(b); }
 
 /* ---------- views ---------- */
 const ICONS = {
@@ -162,8 +214,10 @@ function renderTabs(){
   const base = ["home","learn","signs","practice","exams","mistakes"].indexOf(cur) >= 0 ? cur : (cur === "cheat" ? "learn" : "home");
   $("#tabs").innerHTML = TABS.map(t => `<button data-act="nav" data-to="${t[0]}" ${t[0]===base?'aria-current="page"':''}>${ICONS[t[0]]}<span>${t[1]}</span></button>`).join("");
 }
-function setRoute(r){ S = null; route = r; if(location.hash !== "#"+r){ try{ history.replaceState(null,"","#"+r); }catch(e){ location.hash = r; } } window.scrollTo(0,0); render(); }
-window.addEventListener("hashchange", () => { const r = location.hash.replace("#","") || "home"; if(r !== route){ route = r; S = null; render(); } });
+function setRoute(r){ saveSession(); S = null; route = r; if(location.hash !== "#"+r){ try{ history.replaceState(null,"","#"+r); }catch(e){ location.hash = r; } } window.scrollTo(0,0); render(); }
+window.addEventListener("hashchange", () => { const r = location.hash.replace("#","") || "home"; if(r !== route){ saveSession(); route = r; S = null; render(); } });
+window.addEventListener("pagehide", saveSession);
+document.addEventListener("visibilitychange", () => { if(document.hidden) saveSession(); });
 
 function viewHome(){
   const dl = daysLeft();
@@ -174,6 +228,7 @@ function viewHome(){
   const avg = l3.length ? (l3.reduce((s,e) => s + e.score/e.total*30, 0)/l3.length).toFixed(1) : null;
   const all = poolAll(); const seen = all.filter(q => store.q[q.id]).length;
   const mist = mistakeIds().length;
+  const due = dueIds().length, nextDays = nextReviewDays();
   const tstats = TOP.map(t => Object.assign({t}, topicStats(t.id)));
   const weakest = tstats.filter(x => x.att >= 1).sort((a,b) => (a.acc||0) - (b.acc||0))[0];
   const unseen = tstats.find(x => x.att === 0);
@@ -206,6 +261,14 @@ function viewHome(){
     <div class="card"><div class="muted small">Questions tried</div><div class="big-num">${seen}<span class="muted" style="font-size:1.4rem"> / ${all.length}</span></div><div class="bar" style="margin-top:8px"><i style="width:${all.length?Math.round(100*seen/all.length):0}%"></i></div></div>
     <div class="card"><div class="muted small">Exams taken</div><div class="big-num">${mocks.length}</div><div class="small muted">${last ? `Last ${last.score}/${last.total}. Best ${best}/30.` + (avg ? ` Average of last ${l3.length}: ${avg}/30.` : "") : "None yet."}</div></div>
     <div class="card"><div class="muted small">Mistakes to clear</div><div class="big-num">${mist}</div>${mist ? `<button class="btn alt" style="margin-top:8px" data-act="mist">Practise them</button>` : `<div class="small muted">Nothing waiting.</div>`}</div>
+    <div class="card"><div class="muted small">Due for review</div><div class="big-num">${due}</div>${due ? `<button class="btn alt" style="margin-top:8px" data-act="due">Review now</button>` : `<div class="small muted">${nextDays ? `Next review in ${nextDays} day${nextDays===1?"":"s"}.` : "Nothing waiting."}</div>`}</div>
+  </section>
+  <section class="card" style="margin-top:14px">
+    <h2 style="margin-bottom:4px">Score by topic</h2>
+    <p class="muted small" style="margin-bottom:10px">Share of your answers that were right, all attempts counted.</p>
+    <table class="tchart"><thead class="sr-only"><tr><th scope="col">Topic</th><th scope="col">Score</th></tr></thead><tbody>
+    ${tstats.map(x => `<tr title="${x.att ? `${x.cor} of ${x.att} answers right` : "Not started"}"><th scope="row"><span class="tchart-n">${x.t.id}</span> ${esc(x.t.title)}</th><td><div class="tchart-track" aria-hidden="true">${x.acc ? `<i style="width:${x.acc}%"></i>` : ""}</div><span class="tchart-v ${x.att?"":"muted"}">${x.att ? x.acc + "%" : "Not started"}</span></td></tr>`).join("")}
+    </tbody></table>
   </section>
   <h2 style="margin:28px 0 12px">Topics</h2>
   <section class="grid g2">
@@ -250,13 +313,13 @@ function viewTopic(id){
 
 function viewCheat(){
   return `
-  <div class="row" style="margin-bottom:10px"><button class="btn ghost" data-act="nav" data-to="learn">All lessons</button></div>
+  <div class="row no-print" style="margin-bottom:10px"><button class="btn ghost" data-act="nav" data-to="learn">All lessons</button><button class="btn alt" data-act="print">Print this sheet</button></div>
   <h1>Numbers to remember</h1>
   <p class="muted" style="margin:6px 0 16px">Every figure here comes from your manual or the Majuma sheets.</p>
   <div class="grid g2">
   ${DATA.cheat.map(g => `<section class="card"><div class="tw" tabindex="0"><table><thead><tr><th colspan="2">${esc(g.h)}</th></tr></thead><tbody>${g.rows.map(r => `<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td></tr>`).join("")}</tbody></table></div></section>`).join("")}
   </div>
-  <div class="row" style="margin-top:16px"><button class="btn" data-act="mock">Test me on these</button></div>`;
+  <div class="row no-print" style="margin-top:16px"><button class="btn" data-act="mock">Test me on these</button></div>`;
 }
 
 function viewSigns(){
@@ -290,6 +353,7 @@ function viewExams(){
   return `
   <h1>Exams</h1>
   <p class="muted" style="margin:6px 0 16px">Thirty questions, no feedback until you finish, like the paper. Your stencil has a "Mistakes" box, so this page counts mistakes too.</p>
+  <p class="muted small" style="margin:-8px 0 16px">${LIMIT ? `Time limit: ${LIMIT} minute${LIMIT===1?"":"s"}. The exam finishes itself when the time runs out.` : "No time limit is set, because the books do not state one. The clock just counts up."}</p>
   <section class="card row" style="justify-content:space-between;margin-bottom:14px"><div><h2 class="h3">Mock exam</h2><div class="muted small">30 questions picked from the whole bank, favouring ones you have missed or not seen. ${mocks.length ? `Last ${mocks[mocks.length-1].score}/30.` : ""}</div></div><button class="btn big" data-act="mock">Start</button></section>
   <h2 style="margin:20px 0 10px">Official test papers</h2>
   <section class="grid g2">${DATA.tests.map(t => `<div class="card row" style="justify-content:space-between"><div><h3>${esc(t.label)}</h3><div class="muted small">30 questions, original order. ${stat(t.id)}</div></div><button class="btn alt" data-act="official" data-id="${t.id}">Start</button></div>`).join("")}</section>
@@ -302,11 +366,93 @@ function viewMistakes(){
   return `
   <h1>Mistakes</h1>
   <p class="muted" style="margin:6px 0 16px">${ids.length} question${ids.length===1?"":"s"} you last got wrong. A question leaves this list the next time you answer it right.</p>
-  <div class="row" style="margin-bottom:16px"><button class="btn big" data-act="mist">Practise all ${ids.length}</button></div>
+  <div class="row" style="margin-bottom:16px"><button class="btn big" data-act="mist">Practise all ${ids.length}</button>${dueIds().length ? `<button class="btn alt big" data-act="due">Review ${dueIds().length} due</button>` : ""}</div>
+  <p class="muted small" style="margin-bottom:16px">Missed questions also come back for review after ${REVIEW_GAPS[0]} day, then after ${REVIEW_GAPS[1]} more days once you get them right.</p>
   <div class="stack">${ids.map(id => { const q = QBY[id]; const ans = q.ans.map(i => q.opts[i]).join(" / "); return `<div class="card"><div class="row" style="justify-content:space-between"><span class="pill">${esc(TBY[q.topic].title)}</span>${q.ref?`<span class="pill">Manual ${esc(q.ref)}</span>`:""}</div><p style="margin-top:8px;font-weight:600">${esc(q.q)}</p>${q.img?qImg(q):""}<p class="small" style="margin-top:6px"><b>Answer:</b> ${esc(ans)}</p></div>`; }).join("")}</div>`;
 }
 
+/* ---------- search ---------- */
+let query = "";
+function tokens(){ return query.toLowerCase().split(/\s+/).filter(Boolean); }
+function hl(text, toks){
+  if(!toks.length) return esc(text);
+  const re = new RegExp("(" + toks.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|") + ")", "ig");
+  return String(text).split(re).map((part, i) => i % 2 ? `<mark>${esc(part)}</mark>` : esc(part)).join("");
+}
+function viewSearch(){
+  const toks = tokens();
+  if(!toks.length) return `<h1>Search</h1><p class="muted" style="margin:6px 0 16px">Type a word in the search box to find lessons and questions.</p>`;
+  const hit = s => { const l = s.toLowerCase(); return toks.every(t => l.indexOf(t) >= 0); };
+  const lessons = [];
+  TOP.forEach(t => (DATA.lessons[t.id]||[]).forEach(p => { if(hit(t.title + " " + p)) lessons.push({t, p}); }));
+  const qs = poolAll().filter(q => hit(q.q + " " + q.opts.join(" ")));
+  const total = lessons.length + qs.length, MAX = 40;
+  $("#live").textContent = total + " result" + (total===1?"":"s");
+  return `
+  <h1>Search</h1>
+  <p class="muted" style="margin:6px 0 16px">${total} result${total===1?"":"s"} for "${esc(query.trim())}".${total > 2*MAX ? ` Showing the first ${MAX} of each kind. Add a word to narrow it down.` : ""}</p>
+  ${lessons.length ? `<h2 style="margin:18px 0 10px">Lessons (${lessons.length})</h2><div class="stack">${lessons.slice(0,MAX).map(x => `<button class="card result" data-act="topic" data-id="${x.t.id}"><span class="pill">${esc(x.t.title)}</span><span class="result-text">${hl(x.p, toks)}</span></button>`).join("")}</div>` : ""}
+  ${qs.length ? `<h2 style="margin:18px 0 10px">Questions (${qs.length})</h2><div class="stack">${qs.slice(0,MAX).map(q => `<div class="card"><div class="row" style="justify-content:space-between"><span class="pill">${esc(TBY[q.topic].title)}</span>${q.ref?`<span class="pill">Manual ${esc(q.ref)}</span>`:""}</div><p style="margin-top:8px;font-weight:600">${hl(q.q, toks)}</p><details class="small" style="margin-top:6px"><summary>Show the answer</summary><p style="margin-top:4px">${hl(q.ans.map(i => q.opts[i]).join(" / "), toks)}</p>${q.note?`<div class="note">${esc(q.note)}</div>`:""}</details><div class="row" style="margin-top:10px"><button class="btn ghost" data-act="one" data-id="${esc(q.id)}">Practise this question</button></div></div>`).join("")}</div>` : ""}`;
+}
+
+/* ---------- about and progress backup ---------- */
+let backupMsg = "", pendingImport = null;
+function viewAbout(){
+  const tried = Object.keys(store.q).length;
+  return `
+  <h1>About and your progress</h1>
+  <section class="card stack" style="margin-top:14px">
+    <h2 class="h3">Move your progress to another phone</h2>
+    <p class="small">Save your progress as a file, send it to the other phone, then import it there. You have tried ${tried} question${tried===1?"":"s"} and taken ${store.exams.length} exam${store.exams.length===1?"":"s"} on this device.</p>
+    <div class="row"><button class="btn" data-act="export">Export progress</button><label class="btn alt file-btn" for="importFile">Import progress</label><input class="sr-only" type="file" id="importFile" accept=".json,application/json"></div>
+    ${backupMsg ? `<p class="small" role="status"><b>${esc(backupMsg)}</b></p>` : ""}
+    ${pendingImport ? `<div class="note"><p><b>Replace the progress on this device?</b> The file has ${Object.keys(pendingImport.q).length} questions tried and ${pendingImport.exams.length} exams. What is saved here now will be overwritten.</p><div class="row" style="margin-top:10px"><button class="btn" data-act="importyes">Replace my progress</button><button class="btn ghost" data-act="importno">Cancel</button></div></div>` : ""}
+  </section>`;
+}
+function exportProgress(){
+  const blob = new Blob([JSON.stringify({app:"botswana-theory-prep", exported:new Date().toISOString(), progress:store}, null, 1)], {type:"application/json"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "theory-test-progress-" + new Date().toISOString().slice(0,10) + ".json";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  backupMsg = "Progress file saved to your downloads."; render(true);
+}
+// Keeps only well-formed records for questions that exist, since the file could have been edited.
+function cleanProgress(o){
+  const p = o && o.app === "botswana-theory-prep" && o.progress;
+  if(!p || typeof p.q !== "object" || !p.q) return null;
+  const num = (x, d) => Number.isFinite(x) && x >= 0 ? x : d;
+  const q = {};
+  Object.keys(p.q).forEach(id => {
+    const s = p.q[id]; if(!QBY[id] || !s) return;
+    const att = Math.floor(num(s.a, 0)); if(!att) return;
+    const c = {a:att, c:Math.min(att, Math.floor(num(s.c, 0))), lw:!!s.lw, t:num(s.t, 0)};
+    if(s.rv) c.rv = {step:Math.min(REVIEW_GAPS.length-1, Math.floor(num(s.rv.step, 0))), due:num(s.rv.due, 0)};
+    q[id] = c;
+  });
+  const exams = (Array.isArray(p.exams) ? p.exams : []).filter(e => e && Number.isFinite(e.score) && Number.isFinite(e.total) && e.total > 0).map(e => ({
+    t:num(e.t, 0), kind:e.kind === "test" ? "test" : "mock", testId:DATA.tests.some(x => x.id === e.testId) ? e.testId : null,
+    label:String(e.label || "Exam"), score:Math.floor(num(e.score, 0)), total:Math.floor(e.total), secs:Math.floor(num(e.secs, 0)),
+    wrong:Array.isArray(e.wrong) ? e.wrong.filter(id => QBY[id]) : []
+  }));
+  return migrate({v:1, examDate:/^\d{4}-\d{2}-\d{2}$/.test(p.examDate) ? p.examDate : "", q, exams});
+}
+function readImport(file){
+  const r = new FileReader();
+  r.onload = () => {
+    let clean = null;
+    try{ clean = cleanProgress(JSON.parse(r.result)); }catch(e){}
+    pendingImport = clean;
+    backupMsg = clean ? "" : "That file is not a progress file from this site. Nothing was changed.";
+    render(true);
+    focusOn(clean ? '[data-act="importyes"]' : '[data-act="export"]');
+  };
+  r.readAsText(file);
+}
+
 /* ---------- quiz view ---------- */
+function clockText(){ const secs = elapsed(); return fmtTime(S.limit ? Math.max(0, S.limit*60 - secs) : secs); }
 function viewQuiz(){
   if(S.finished) return viewResults();
   const it = S.items[S.i], q = it.q, n = S.items.length, multi = q.ans.length > 1;
@@ -331,7 +477,7 @@ function viewQuiz(){
   return `
   <div class="row" style="justify-content:space-between;margin-bottom:10px">
     <div><h1 style="font-size:1.4rem">${esc(S.title)}</h1><div class="muted small">Question ${S.i+1} of ${n}${S.exam?`, ${answered} answered`:""}</div></div>
-    <div class="row"><span class="timer pill" id="timer">${fmtTime(Math.round((Date.now()-S.t0)/1000))}</span><button class="btn ghost" data-act="quit">${S.exam?"Quit":"Stop"}</button></div>
+    <div class="row"><span class="timer pill" id="timer" role="timer">${clockText()}</span><button class="btn ghost" data-act="quit">${S.exam?"Quit":"Stop"}</button></div>
   </div>
   <div class="bar" style="margin-bottom:16px"><i style="width:${Math.round(100*(S.i+(showFb?1:0))/n)}%"></i></div>
   <div class="grid ${S.exam?"quizgrid":""}" style="${S.exam?"grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));align-items:start":""}">
@@ -365,6 +511,7 @@ function viewResults(){
   const weakT = Object.keys(byTopic).filter(t => byTopic[t].w).sort((a,b) => byTopic[b].w - byTopic[a].w);
   return `
   <h1>${esc(S.title)}</h1>
+  ${S.timedOut ? `<div class="note">Time ran out, so the exam finished by itself. Questions you had not answered count as mistakes.</div>` : ""}
   <section class="card" style="margin:14px 0"><div class="row" style="gap:24px;align-items:flex-end"><div><div class="score">${S.score}<span class="muted" style="font-size:2rem">/${n}</span></div><div class="muted">${pct}% right</div></div>
     <div><div class="big-num" style="color:${mist?"var(--bad)":"var(--good)"}">${mist}</div><div class="muted">mistake${mist===1?"":"s"}</div></div>
     <div><div class="big-num">${fmtTime(S.secs)}</div><div class="muted">time taken</div></div></div>
@@ -403,7 +550,7 @@ function focusKey(el){
   return '[data-act="' + el.dataset.act + '"]' + ["k","i","id","to","n","t"].map(a => el.dataset[a] !== undefined ? `[data-${a}="${el.dataset[a]}"]` : "").join("");
 }
 const BASE_TITLE = document.title;
-const SCREEN_TITLES = {learn:"Learn", cheat:"Numbers to remember", signs:"Road signs", practice:"Practice", exams:"Exams", mistakes:"Mistakes"};
+const SCREEN_TITLES = {learn:"Learn", cheat:"Numbers to remember", signs:"Road signs", practice:"Practice", exams:"Exams", mistakes:"Mistakes", about:"About and your progress", search:"Search"};
 let firstRender = true;
 function render(keep){
   const y = window.scrollY, fk = focusKey(document.activeElement);
@@ -413,20 +560,31 @@ function render(keep){
   else {
     const [r, arg] = route.split("-");
     if(r === "learn" && arg) html = viewTopic(+arg);
-    else html = ({home:viewHome, learn:viewLearn, cheat:viewCheat, signs:viewSigns, practice:viewPractice, exams:viewExams, mistakes:viewMistakes}[r] || viewHome)();
+    else html = ({home:viewHome, learn:viewLearn, cheat:viewCheat, signs:viewSigns, practice:viewPractice, exams:viewExams, mistakes:viewMistakes, about:viewAbout, search:viewSearch}[r] || viewHome)();
   }
-  $("#app").innerHTML = html;
+  $("#app").innerHTML = (S ? "" : resumeCard()) + html;
   const st = S ? S.title : SCREEN_TITLES[route.split("-")[0]];
   document.title = st ? st + " | Botswana Theory Test Prep" : BASE_TITLE;
   if(keep){
     window.scrollTo(0, y);
     const again = fk && $(fk); if(again && !again.disabled) again.focus({preventScroll:true});
-  }else if(!firstRender){
+  }else if(!firstRender && document.activeElement.id !== "q"){
     focusOn(S && !S.finished ? ".q-text" : "#app h1");
   }
   firstRender = false;
+  saveSession();
 }
-setInterval(() => { if(S && !S.finished){ const t = $("#timer"); if(t) t.textContent = fmtTime(Math.round((Date.now()-S.t0)/1000)); } }, 1000);
+setInterval(() => {
+  if(!S || S.finished) return;
+  const secs = elapsed();
+  if(S.limit){
+    const left = S.limit*60 - secs;
+    if(left <= 0){ S.timedOut = true; finish(); return; }
+    if(left === 300 || left === 60) $("#live").textContent = (left/60) + (left === 60 ? " minute" : " minutes") + " left";
+  }
+  const t = $("#timer"); if(t){ t.textContent = clockText(); t.classList.toggle("warn", !!S.limit && S.limit*60 - secs <= 60); }
+  if(secs % 10 === 0) saveSession();
+}, 1000);
 
 /* ---------- events ---------- */
 document.addEventListener("click", e => {
@@ -442,6 +600,14 @@ document.addEventListener("click", e => {
     case "mock": startMock(); break;
     case "official": startOfficial(el.dataset.id); break;
     case "mist": startMistakes(); break;
+    case "due": startDue(); break;
+    case "resume": resumeSession(); break;
+    case "discard": clearSession(); render(true); focusOn("#app h1"); break;
+    case "print": window.print(); break;
+    case "one": startSession({kind:"practice", title:"Practice", qs:[QBY[el.dataset.id]], exam:false, back:"search"}); break;
+    case "export": exportProgress(); break;
+    case "importyes": store = pendingImport; pendingImport = null; save(); backupMsg = "Progress imported."; render(true); focusOn('[data-act="export"]'); break;
+    case "importno": pendingImport = null; backupMsg = ""; render(true); focusOn('[data-act="export"]'); break;
     case "weak": startWeak(); break;
     case "signquiz": startSigns(+el.dataset.n); break;
     case "startprac": {
@@ -485,7 +651,13 @@ document.addEventListener("click", e => {
 });
 document.addEventListener("change", e => {
   if(e.target.id === "examDate"){ store.examDate = e.target.value; save(); render(true); }
+  if(e.target.id === "importFile" && e.target.files[0]) readImport(e.target.files[0]);
 });
+$("#q").addEventListener("input", e => {
+  query = e.target.value;
+  if(query.trim() || route === "search"){ if(route !== "search"){ saveSession(); S = null; route = "search"; try{ history.replaceState(null,"","#search"); }catch(err){} window.scrollTo(0,0); } render(); }
+});
+$("#searchForm").addEventListener("submit", e => { e.preventDefault(); if(route === "search") focusOn("#app h1"); });
 document.addEventListener("keydown", e => {
   if(e.target.matches && e.target.matches("input,select,textarea")) return;
   if(LB){ if(e.key === "Escape"){ closeLB(); } else if(e.key === "ArrowRight" && LB.list.length>1){ LB.i = (LB.i+1)%LB.list.length; drawLB(); } else if(e.key === "ArrowLeft" && LB.list.length>1){ LB.i = (LB.i-1+LB.list.length)%LB.list.length; drawLB(); } return; }

@@ -24,7 +24,8 @@ function isFallback(rel){ return /^pages\/[^/]+\.jpg$/.test(rel) && fs.existsSyn
 function generated(){
   const files = walk("", []);
   const hash = crypto.createHash("sha256");
-  files.forEach(f => { hash.update(f); hash.update(fs.readFileSync(path.join(ROOT, f))); });
+  // js/config.js is left out of the hash because the service worker always asks the network for it first.
+  files.forEach(f => { hash.update(f); if(f !== "js/config.js") hash.update(fs.readFileSync(path.join(ROOT, f))); });
   const list = ["./"].concat(files).map(f => "  " + JSON.stringify(f)).join(",\n");
   return `/* BEGIN GENERATED */\nconst VERSION = "${hash.digest("hex").slice(0, 12)}";\nconst PRECACHE = [\n${list}\n];\n/* END GENERATED */`;
 }

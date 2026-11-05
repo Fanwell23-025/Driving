@@ -1,7 +1,7 @@
 /* Service worker: keeps the whole site on the device so it works with no signal.
    VERSION and PRECACHE are generated. Run `node scripts/build-precache.js` to refresh them. */
 /* BEGIN GENERATED */
-const VERSION = "903739a24e6b";
+const VERSION = "7b72729f05ce";
 const PRECACHE = [
   "./",
   "404.html",
@@ -71,6 +71,7 @@ const PRECACHE = [
   "img/sp_q3.jpg",
   "index.html",
   "js/app.js",
+  "js/config.js",
   "manifest.webmanifest",
   "pages/p032.webp",
   "pages/p033.webp",
@@ -210,6 +211,14 @@ self.addEventListener("fetch", e => {
     // A page load: the app itself comes from the cache, anything else from the network (so 404.html still works online).
     e.respondWith(
       caches.match(req, {ignoreSearch: true}).then(hit => hit || fetch(req)).catch(() => caches.match("index.html"))
+    );
+    return;
+  }
+  if(new URL(req.url).pathname.endsWith("/js/config.js")){
+    // Settings: take the latest when online, so editing the file reaches phones without a rebuild.
+    e.respondWith(
+      fetch(req).then(res => { const copy = res.clone(); if(res.ok) caches.open(CACHE).then(c => c.put(req, copy)); return res; })
+        .catch(() => caches.match(req, {ignoreSearch: true}))
     );
     return;
   }
